@@ -10,11 +10,14 @@ export const getContactsController = async (req, res) => {
   const { page, perPage } = parsePaginationParams(req.query);
   const { sortBy, sortOrder } = parseSortParams(req.query, sortByList);
 
+  const { _id: userId } = req.user;
+  const filter = { userId: userId };
   const data = await contactServices.getContacts({
     page,
     perPage,
     sortBy,
     sortOrder,
+    filter,
   });
   res.json({
     status: 200,
@@ -41,12 +44,13 @@ export const getContactByIdController = async (req, res) => {
 };
 
 export const addContactController = async (req, res) => {
+  const { _id: userId } = req.user;
   const { error } = contactAddSchema.validate(req.body, { abortEarly: false });
   if (error) {
     throw createHttpError(400, error.message);
   }
 
-  const data = await contactServices.addContact(req.body);
+  const data = await contactServices.addContact({ ...req.body, userId });
   res.status(201).json({
     status: 201,
     message: "Successfully created a contact!",
