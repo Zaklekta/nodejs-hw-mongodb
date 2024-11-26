@@ -5,11 +5,16 @@ import { contactAddSchema } from "../validation/contacts.js";
 import { parsePaginationParams } from "../utils/parsePaginationParams.js";
 import { parseSortParams } from "../utils/parseSortParams.js";
 import { sortByList } from "../db/models/Contact.js";
+import { saveFileToUploadDir } from "../utils/saveFileToUploadDir.js";
+import path from "node:path";
+import { saveFileToCloudinary } from "../utils/saveFileToCloudinary.js";
+import { env } from "../utils/env.js";
+
+const enableCloudinary = env("ENABLE_CLOUDINARY");
 
 export const getContactsController = async (req, res) => {
   const { page, perPage } = parsePaginationParams(req.query);
   const { sortBy, sortOrder } = parseSortParams(req.query, sortByList);
-  console.log(req.user);
   const { _id: userId } = req.user;
   const filter = { userId: userId };
   const data = await contactServices.getContacts({
@@ -47,12 +52,21 @@ export const getContactByIdController = async (req, res) => {
 
 export const addContactController = async (req, res) => {
   const { _id: userId } = req.user;
+  let photo = null;
+  if (req.file) {
+    if (enableCloudinary === "true") {
+      photo = await saveFileToCloudinary(req.file, "photos");
+    } else {
+      await saveFileToUploadDir(req.file);
+      photo = path.join(req.file.filename);
+    }
+  }
   const { error } = contactAddSchema.validate(req.body, { abortEarly: false });
   if (error) {
     throw createHttpError(400, error.message);
   }
 
-  const data = await contactServices.addContact({ ...req.body, userId });
+  const data = await contactServices.addContact({ ...req.body, photo, userId });
   res.status(201).json({
     status: 201,
     message: "Successfully created a contact!",
@@ -63,10 +77,21 @@ export const addContactController = async (req, res) => {
 export const upsertContactController = async (req, res) => {
   const { id: contactId } = req.params;
   const { _id: userId } = req.user;
+  const photo = req.file;
+  console.log(photo);
+  let photoUrl;
+  if (photo) {
+    if (enableCloudinary === "true") {
+      photoUrl = await saveFileToCloudinary(req.file, "photos");
+    } else {
+      await saveFileToUploadDir(req.file);
+      photoUrl = path.join(req.file.filename);
+    }
+  }
   const data = await contactServices.updateContact({
     contactId,
     userId,
-    payload: req.body,
+    payload: { ...req.body, photo: photoUrl },
     options: { upsert: true },
   });
   if (!data) {
@@ -81,11 +106,22 @@ export const upsertContactController = async (req, res) => {
 export const patchContactController = async (req, res) => {
   const { id: contactId } = req.params;
   const { _id: userId } = req.user;
+  const photo = req.file;
+  let photoUrl;
+
+  if (photo) {
+    if (enableCloudinary === "true") {
+      photoUrl = await saveFileToCloudinary(req.file, "photos");
+    } else {
+      await saveFileToUploadDir(req.file);
+      photoUrl = path.join(req.file.filename);
+    }
+  }
 
   const result = await contactServices.updateContact({
     contactId,
     userId,
-    payload: req.body,
+    payload: { ...req.body, photo: photoUrl },
   });
   if (!result) {
     throw createHttpError(404, "Contact not found");
