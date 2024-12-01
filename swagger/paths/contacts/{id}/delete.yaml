@@ -14,7 +14,7 @@ parameters:
       type: string
       example: "674474a9543ed7771f04759a"
 responses:
-  "200":
+  "204":
     description: No content - Successfully deleted the contact!
   "401":
     $ref: "../../../components/responses/401.yaml"
